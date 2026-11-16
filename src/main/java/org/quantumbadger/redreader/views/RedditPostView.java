@@ -1,0 +1,587 @@
+/*******************************************************************************
+ * This file is part of RedReader.
+ *
+ * RedReader is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * RedReader is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with RedReader.  If not, see <http://www.gnu.org/licenses/>.
+ ******************************************************************************/
+
+package org.quantumbadger.redreader.views;
+
+import android.content.Context;
+import android.content.res.TypedArray;
+import android.graphics.Bitmap;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
+import android.util.TypedValue;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.annotation.UiThread;
+import androidx.constraintlayout.widget.ConstraintLayout;
+
+import org.quantumbadger.redreader.R;
+import org.quantumbadger.redreader.activities.BaseActivity;
+import org.quantumbadger.redreader.common.AndroidCommon;
+import org.quantumbadger.redreader.common.General;
+import org.quantumbadger.redreader.common.PrefsUtility;
+import org.quantumbadger.redreader.common.RRError;
+import org.quantumbadger.redreader.fragments.PostListingFragment;
+import org.quantumbadger.redreader.reddit.api.RedditPostActions;
+import org.quantumbadger.redreader.reddit.prepared.InlinePreviewLoader;
+import org.quantumbadger.redreader.reddit.prepared.RedditPreparedPost;
+import org.quantumbadger.redreader.views.liststatus.ErrorView;
+
+import java.util.ArrayList;
+import java.util.Objects;
+
+public final class RedditPostView extends FlingableItemView
+		implements RedditPreparedPost.ThumbnailLoadedCallback,
+		InlinePreviewLoader.Listener {
+
+	private final AccessibilityActionManager mAccessibilityActionManager;
+
+	private RedditPreparedPost mPost = null;
+	private final TextView title;
+	private final TextView subtitle;
+
+	@NonNull private final ImageView mThumbnailView;
+	@NonNull private final ImageView mOverlayIcon;
+
+	@NonNull private final LinearLayout mOuterView;
+	@NonNull private final LinearLayout mInnerView;
+	@NonNull private final LinearLayout mCommentsButton;
+	@NonNull private final TextView mCommentsText;
+	@NonNull private final LinearLayout mPostErrors;
+	@NonNull private final InlinePreviewHolderView mImagePreviewHolder;
+	@NonNull private final ImageView mImagePreviewImageView;
+	@NonNull private final ConstraintLayout mImagePreviewPlayOverlay;
+	@NonNull private final LinearLayout mImagePreviewOuter;
+	@NonNull private final LoadingSpinnerView mImagePreviewLoadingSpinner;
+
+	private int mUsageId = 0;
+
+	@Nullable private InlinePreviewLoader mPreviewLoader = null;
+
+	private final Handler thumbnailHandler;
+
+	private final BaseActivity mActivity;
+
+	private final PrefsUtility.PostFlingAction mLeftFlingPref;
+	private final PrefsUtility.PostFlingAction mRightFlingPref;
+	private RedditPostActions.ActionDescriptionPair mLeftFlingAction;
+	private RedditPostActions.ActionDescriptionPair mRightFlingAction;
+
+	private final boolean mCommentsButtonPref;
+
+	private final int
+			rrPostTitleReadCol;
+	private final int rrPostTitleCol;
+
+	private final int mThumbnailSizePrefPixels;
+
+	@Override
+	protected void onSetItemFlingPosition(final float position) {
+		mOuterView.setTranslationX(position);
+	}
+
+	@NonNull
+	@Override
+	protected String getFlingLeftText() {
+
+		mLeftFlingAction = RedditPostActions.ActionDescriptionPair.from(mPost, mLeftFlingPref);
+
+		if(mLeftFlingAction != null) {
+			return mActivity.getString(mLeftFlingAction.getDescriptionRes());
+		} else {
+			return "Disabled";
+		}
+	}
+
+	@NonNull
+	@Override
+	protected String getFlingRightText() {
+
+		mRightFlingAction = RedditPostActions.ActionDescriptionPair.from(mPost, mRightFlingPref);
+
+		if(mRightFlingAction != null) {
+			return mActivity.getString(mRightFlingAction.getDescriptionRes());
+		} else {
+			return "Disabled";
+		}
+	}
+
+	@Override
+	protected boolean allowFlingingLeft() {
+		return mLeftFlingAction != null;
+	}
+
+	@Override
+	protected boolean allowFlingingRight() {
+		return mRightFlingAction != null;
+	}
+
+	@Override
+	protected void onFlungLeft() {
+		RedditPostActions.INSTANCE.onActionMenuItemSelected(
+				mPost,
+				mActivity,
+				mLeftFlingAction.getAction());
+	}
+
+	@Override
+	protected void onFlungRight() {
+		RedditPostActions.INSTANCE.onActionMenuItemSelected(
+				mPost,
+				mActivity,
+				mRightFlingAction.getAction());
+	}
+
+
+
+	public RedditPostView(
+			final Context context,
+			final PostListingFragment fragmentParent,
+			final BaseActivity activity,
+			final boolean leftHandedMode) {
+
+		super(context);
+		mActivity = activity;
+
+		mAccessibilityActionManager = new AccessibilityActionManager(
+				this,
+				context.getResources());
+
+		thumbnailHandler = new Handler(Looper.getMainLooper()) {
+			@Override
+			public void handleMessage(@NonNull final Message msg) {
+				if(mUsageId != msg.what) {
+					return;
+				}
+				mThumbnailView.setImageBitmap((Bitmap)msg.obj);
+			}
+		};
+
+		final float dpScale = context.getResources().getDisplayMetrics().density;
+
+		final float titleFontScale = PrefsUtility.appearance_fontscale_posts();
+		final float subtitleFontScale = PrefsUtility.appearance_fontscale_post_subtitles();
+
+		final View rootView =
+				LayoutInflater.from(context).inflate(R.layout.reddit_post, this, true);
+
+		mOuterView = Objects.requireNonNull(rootView.findViewById(R.id.reddit_post_layout_outer));
+		mInnerView = Objects.requireNonNull(rootView.findViewById(R.id.reddit_post_layout_inner));
+
+		mPostErrors = Objects.requireNonNull(rootView.findViewById(R.id.reddit_post_errors));
+
+		mImagePreviewHolder = Objects.requireNonNull(
+				rootView.findViewById(R.id.reddit_post_image_preview_holder));
+
+		mImagePreviewImageView = Objects.requireNonNull(
+				rootView.findViewById(R.id.reddit_post_image_preview_imageview));
+
+		mImagePreviewPlayOverlay = Objects.requireNonNull(
+				rootView.findViewById(R.id.reddit_post_image_preview_play_overlay));
+
+		mImagePreviewOuter = Objects.requireNonNull(
+				rootView.findViewById(R.id.reddit_post_image_preview_outer));
+
+
+		mImagePreviewLoadingSpinner = new LoadingSpinnerView(activity);
+		mImagePreviewHolder.addView(mImagePreviewLoadingSpinner);
+
+		mThumbnailView = Objects.requireNonNull(
+				rootView.findViewById(R.id.reddit_post_thumbnail_view));
+
+		mOverlayIcon = Objects.requireNonNull(
+				rootView.findViewById(R.id.reddit_post_overlay_icon));
+
+		title = Objects.requireNonNull(rootView.findViewById(R.id.reddit_post_title));
+		subtitle = Objects.requireNonNull(rootView.findViewById(R.id.reddit_post_subtitle));
+
+		General.suppressAccessibilityTextChangeEvents(subtitle);
+
+		mCommentsButtonPref =
+				PrefsUtility.appearance_post_show_comments_button();
+
+		mCommentsButton = rootView.findViewById(R.id.reddit_post_comments_button);
+		mCommentsText = mCommentsButton.findViewById(R.id.reddit_post_comments_text);
+
+		if(!mCommentsButtonPref) {
+			mInnerView.removeView(mCommentsButton);
+		}
+
+		if(leftHandedMode) {
+			final ArrayList<View> innerViewElements = new ArrayList<>(3);
+			for(int i = mInnerView.getChildCount() - 1; i >= 0; i--) {
+				innerViewElements.add(mInnerView.getChildAt(i));
+				mInnerView.removeViewAt(i);
+			}
+
+			for(int i = 0; i < innerViewElements.size(); i++) {
+				mInnerView.addView(innerViewElements.get(i));
+			}
+
+			mInnerView.setNextFocusRightId(NO_ID);
+			if (mCommentsButtonPref) {
+				mInnerView.setNextFocusLeftId(mCommentsButton.getId());
+
+				mCommentsButton.setNextFocusForwardId(R.id.reddit_post_layout_outer);
+				mCommentsButton.setNextFocusRightId(R.id.reddit_post_layout_outer);
+				mCommentsButton.setNextFocusLeftId(NO_ID);
+			}
+		}
+
+		final OnLongClickListener longClickListener = v -> {
+			RedditPostActions.INSTANCE.showActionMenu(mActivity, mPost);
+			return true;
+		};
+
+		switch(PrefsUtility.pref_behaviour_post_tap_action()) {
+			case LINK:
+				mOuterView.setOnClickListener(v -> fragmentParent.onPostSelected(mPost));
+				AndroidCommon.removeClickListeners(mThumbnailView);
+				AndroidCommon.removeClickListeners(mImagePreviewOuter);
+				AndroidCommon.removeClickListeners(title);
+				break;
+
+			case COMMENTS:
+				mOuterView.setOnClickListener(v -> fragmentParent.onPostCommentsSelected(mPost));
+
+				mThumbnailView.setOnClickListener(v -> fragmentParent.onPostSelected(mPost));
+				mThumbnailView.setOnLongClickListener(longClickListener);
+
+				mImagePreviewOuter.setOnClickListener(v -> fragmentParent.onPostSelected(mPost));
+				mImagePreviewOuter.setOnLongClickListener(longClickListener);
+
+				AndroidCommon.removeClickListeners(title);
+
+				break;
+
+			case TITLE_COMMENTS:
+				mOuterView.setOnClickListener(v -> fragmentParent.onPostSelected(mPost));
+
+				AndroidCommon.removeClickListeners(mThumbnailView);
+				AndroidCommon.removeClickListeners(mImagePreviewOuter);
+
+				title.setOnClickListener(v -> fragmentParent.onPostCommentsSelected(mPost));
+				title.setOnLongClickListener(longClickListener);
+				break;
+		}
+
+		mOuterView.setOnLongClickListener(longClickListener);
+
+		if(mCommentsButtonPref) {
+			mCommentsButton.setOnClickListener(v -> fragmentParent.onPostCommentsSelected(mPost));
+		}
+
+		title.setTextSize(
+				TypedValue.COMPLEX_UNIT_PX,
+				title.getTextSize() * titleFontScale);
+		subtitle.setTextSize(
+				TypedValue.COMPLEX_UNIT_PX,
+				subtitle.getTextSize() * subtitleFontScale);
+
+		mLeftFlingPref =
+				PrefsUtility.pref_behaviour_fling_post_left();
+		mRightFlingPref =
+				PrefsUtility.pref_behaviour_fling_post_right();
+
+		{
+			final TypedArray attr = context.obtainStyledAttributes(new int[] {
+					R.attr.rrPostTitleCol,
+					R.attr.rrPostTitleReadCol,
+			});
+
+			rrPostTitleCol = attr.getColor(0, 0);
+			rrPostTitleReadCol = attr.getColor(1, 0);
+			attr.recycle();
+		}
+
+		mThumbnailSizePrefPixels = (int)(dpScale * PrefsUtility.images_thumbnail_size_dp());
+	}
+
+	@UiThread
+	public void reset(@NonNull final RedditPreparedPost newPost) {
+
+		final boolean isNewPost = newPost != mPost;
+		final boolean showInlinePreview = newPost.shouldShowInlinePreview();
+
+		if(isNewPost) {
+
+			if(mPreviewLoader != null) {
+				mPreviewLoader.setListener(null);
+				mPreviewLoader = null;
+			}
+
+			mThumbnailView.setImageBitmap(null);
+			mImagePreviewImageView.setImageBitmap(null);
+			mImagePreviewPlayOverlay.setVisibility(GONE);
+			mPostErrors.removeAllViews();
+
+			mUsageId++;
+
+			resetSwipeState();
+
+			title.setText(newPost.src.getTitle());
+
+			// TextView doesn't request a layout if the new text fits in the same number
+			// of lines at the view's current width, which leaves stale sizes in its
+			// measure cache (and its parent's). When this recycled view is then measured
+			// at a different width (e.g. the thumbnail column appearing or disappearing),
+			// those stale sizes are reused, and the title is cut off.
+			title.requestLayout();
+
+			if(mCommentsButtonPref) {
+				mCommentsText.setText(String.valueOf(newPost.src.getSrc().getNum_comments()));
+			}
+
+			final boolean showThumbnail = !showInlinePreview && newPost.hasThumbnail;
+
+			if(!showInlinePreview) {
+				mImagePreviewLoadingSpinner.setVisibility(GONE);
+				mImagePreviewOuter.setVisibility(GONE);
+				setBottomMargin(false);
+			}
+
+			if(showThumbnail) {
+
+				final Bitmap thumbnail = newPost.getThumbnail(this, mUsageId);
+				mThumbnailView.setImageBitmap(thumbnail);
+
+				mThumbnailView.setVisibility(VISIBLE);
+				mThumbnailView.setMinimumWidth(mThumbnailSizePrefPixels);
+
+				General.setLayoutWidthHeight(
+						mThumbnailView,
+						ViewGroup.LayoutParams.WRAP_CONTENT,
+						ViewGroup.LayoutParams.MATCH_PARENT);
+
+				mInnerView.setMinimumHeight(mThumbnailSizePrefPixels);
+
+			} else {
+				mThumbnailView.setMinimumWidth(0);
+				mThumbnailView.setVisibility(GONE);
+				mInnerView.setMinimumHeight(General.dpToPixels(mActivity, 64));
+			}
+		}
+
+		if(mPost != null) {
+			mPost.unbind(this);
+		}
+
+		newPost.bind(this);
+
+		mPost = newPost;
+
+		// Attaching to the preview loader calls back into this view, so must happen after
+		// mPost has been updated
+		if(isNewPost && showInlinePreview) {
+			attachInlinePreview(newPost);
+		}
+
+		updateAppearance();
+	}
+
+	public void updateAppearance() {
+
+		mOuterView.setBackgroundResource(
+				R.drawable.rr_postlist_item_selector_main);
+
+		if(mCommentsButtonPref) {
+			mCommentsButton.setBackgroundResource(
+					R.drawable.rr_postlist_commentbutton_selector_main);
+		}
+
+		if(mPost.isRead()) {
+			title.setTextColor(rrPostTitleReadCol);
+		} else {
+			title.setTextColor(rrPostTitleCol);
+		}
+
+		title.setContentDescription(mPost.buildAccessibilityTitle(mActivity, false));
+
+		subtitle.setText(mPost.buildSubtitle(mActivity, false));
+		subtitle.requestLayout(); // See the comment on the title in reset()
+		subtitle.setContentDescription(mPost.buildAccessibilitySubtitle(mActivity, false));
+
+		boolean overlayVisible = true;
+
+		if(mPost.isSaved()) {
+			mOverlayIcon.setImageResource(R.drawable.star_dark);
+
+		} else if(mPost.isHidden()) {
+			mOverlayIcon.setImageResource(R.drawable.ic_action_cross_dark);
+
+		} else if(mPost.isUpvoted()) {
+			mOverlayIcon.setImageResource(R.drawable.arrow_up_bold_orangered);
+
+		} else if(mPost.isDownvoted()) {
+			mOverlayIcon.setImageResource(R.drawable.arrow_down_bold_periwinkle);
+
+		} else {
+			overlayVisible = false;
+		}
+
+		if(overlayVisible) {
+			mOverlayIcon.setVisibility(VISIBLE);
+		} else {
+			mOverlayIcon.setVisibility(GONE);
+		}
+
+		RedditPostActions.INSTANCE.setupAccessibilityActions(
+				mAccessibilityActionManager,
+				mPost,
+				mActivity,
+				false);
+	}
+
+	@Override
+	public void betterThumbnailAvailable(
+			final Bitmap thumbnail,
+			final int callbackUsageId) {
+		final Message msg = Message.obtain();
+		msg.obj = thumbnail;
+		msg.what = callbackUsageId;
+		thumbnailHandler.sendMessage(msg);
+	}
+
+	public interface PostSelectionListener {
+		void onPostSelected(RedditPreparedPost post);
+
+		void onPostCommentsSelected(RedditPreparedPost post);
+	}
+
+	private void setBottomMargin(final boolean enabled) {
+
+		final MarginLayoutParams layoutParams
+				= (MarginLayoutParams)mOuterView.getLayoutParams();
+
+		if(enabled) {
+			layoutParams.bottomMargin = General.dpToPixels(mActivity, 6);
+		} else {
+			layoutParams.bottomMargin = 0;
+		}
+
+		mOuterView.setLayoutParams(layoutParams);
+	}
+
+	@Override
+	protected void onAttachedToWindow() {
+		super.onAttachedToWindow();
+
+		if(mPreviewLoader != null) {
+			mPreviewLoader.setListener(this);
+		}
+	}
+
+	@Override
+	protected void onDetachedFromWindow() {
+		super.onDetachedFromWindow();
+
+		// While this view is recycled it has no claim on the preview, which allows the
+		// preview to be released if the post is also outside the preload window
+		if(mPreviewLoader != null) {
+			mPreviewLoader.setListener(null);
+		}
+	}
+
+	private void attachInlinePreview(@NonNull final RedditPreparedPost post) {
+
+		final InlinePreviewLoader.PreviewDetails details
+				= InlinePreviewLoader.calculatePreviewDetails(mActivity, post);
+
+		final InlinePreviewLoader loader = post.getInlinePreviewLoader(mActivity);
+
+		if(details == null || loader == null) {
+			mImagePreviewHolder.setImageSize(0, 0);
+			mImagePreviewOuter.setVisibility(GONE);
+			mImagePreviewLoadingSpinner.setVisibility(GONE);
+			setBottomMargin(false);
+			return;
+		}
+
+		mImagePreviewHolder.setImageSize(details.imageWidthPx, details.imageHeightPx);
+
+		mImagePreviewOuter.setVisibility(VISIBLE);
+		setBottomMargin(true);
+
+		mPreviewLoader = loader;
+
+		// This calls back into onInlinePreviewStateChanged with the current state, which
+		// will be the fully loaded image if this post has already been preloaded
+		loader.setListener(this);
+	}
+
+	@Override
+	public void onInlinePreviewStateChanged(@NonNull final InlinePreviewLoader loader) {
+
+		if(loader != mPreviewLoader) {
+			return;
+		}
+
+		mPostErrors.removeAllViews();
+
+		switch(loader.getState()) {
+
+			case LOADED:
+
+				mImagePreviewImageView.setImageBitmap(loader.getBitmap());
+				mImagePreviewLoadingSpinner.setVisibility(GONE);
+				mImagePreviewOuter.setVisibility(VISIBLE);
+				setBottomMargin(true);
+
+				if(mPost.isVideoPreview()) {
+					mImagePreviewPlayOverlay.setVisibility(VISIBLE);
+				}
+
+				break;
+
+			case FAILED:
+
+				mImagePreviewImageView.setImageBitmap(null);
+				mImagePreviewPlayOverlay.setVisibility(GONE);
+				mImagePreviewLoadingSpinner.setVisibility(GONE);
+				mImagePreviewOuter.setVisibility(GONE);
+
+				final RRError error = loader.getError();
+
+				if(error != null) {
+					final ErrorView errorView = new ErrorView(mActivity, error);
+					mPostErrors.addView(errorView);
+					General.setLayoutMatchWidthWrapHeight(errorView);
+				}
+
+				break;
+
+			case NOT_LOADED:
+			case LOADING:
+			default:
+
+				mImagePreviewImageView.setImageBitmap(null);
+				mImagePreviewPlayOverlay.setVisibility(GONE);
+				mImagePreviewLoadingSpinner.setVisibility(VISIBLE);
+				mImagePreviewOuter.setVisibility(VISIBLE);
+				setBottomMargin(true);
+
+				break;
+		}
+	}
+}
