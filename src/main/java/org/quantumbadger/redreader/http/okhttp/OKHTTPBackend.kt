@@ -40,7 +40,6 @@ import org.quantumbadger.redreader.common.Result
 import org.quantumbadger.redreader.common.TorCommon
 import org.quantumbadger.redreader.common.UriString
 import org.quantumbadger.redreader.common.WatchHelper
-import org.quantumbadger.redreader.common.WatchHelper
 import org.quantumbadger.redreader.http.FailedRequestBody
 import org.quantumbadger.redreader.http.HTTPBackend
 import org.quantumbadger.redreader.http.body.HTTPRequestBody
