@@ -104,7 +104,8 @@ object RedditOAuth {
 	}
 
 	private fun checkAccess(context: Context, user: RedditAccount?): RRError? {
-		if (appId == null) {
+		if (appId == null || user?.refreshToken?.token == "COOKIE_SESSION") return null
+        if (false) {
 			return RRError(
 				title = "Reddit authentication failure",
 				message = "If you compiled this copy of RedReader yourself, you must specify the Reddit client ID. Please see CONTRIBUTING.md for more details, or contact the developer.",
@@ -134,7 +135,7 @@ object RedditOAuth {
 	}
 
 	@JvmStatic
-	fun needsRelogin(user: RedditAccount) = !user.isAnonymous && user.clientId != cachedAppId.hash
+	fun needsRelogin(user: RedditAccount) = !user.isAnonymous && user.refreshToken?.token != "COOKIE_SESSION" && user.clientId != cachedAppId.hash
 
 	@JvmStatic
 	fun anyNeedRelogin(context: Context) =
@@ -560,7 +561,8 @@ object RedditOAuth {
 		user: RedditAccount
 	): FetchAccessTokenResult {
 
-		checkAccess(context, user)?.apply {
+		if (appId == null || user.refreshToken?.token == "COOKIE_SESSION") return FetchAccessTokenResult(AccessToken("COOKIE_SESSION"))
+        checkAccess(context, user)?.apply {
 			return FetchAccessTokenResult(FetchAccessTokenResultStatus.INVALID_REQUEST, this)
 		}
 
@@ -661,7 +663,8 @@ object RedditOAuth {
 		context: Context
 	): FetchAccessTokenResult {
 
-		checkAccess(context, RedditAccountManager.getAnon())?.apply {
+		if (appId == null) return FetchAccessTokenResult(AccessToken("ANON_PUBLIC"))
+        checkAccess(context, RedditAccountManager.getAnon())?.apply {
 			return FetchAccessTokenResult(FetchAccessTokenResultStatus.INVALID_REQUEST, this)
 		}
 

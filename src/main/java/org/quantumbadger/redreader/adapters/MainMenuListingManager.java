@@ -48,6 +48,9 @@ import org.quantumbadger.redreader.common.PrefsUtility;
 import org.quantumbadger.redreader.common.ScreenreaderPronunciation;
 import org.quantumbadger.redreader.common.SharedPrefsWrapper;
 import org.quantumbadger.redreader.common.UriString;
+import org.quantumbadger.redreader.common.WatchHelper;
+import org.quantumbadger.redreader.activities.OAuthLoginActivity;
+import org.quantumbadger.redreader.fragments.AccountListDialog;
 import org.quantumbadger.redreader.fragments.MainMenuFragment;
 import org.quantumbadger.redreader.receivers.announcements.Announcement;
 import org.quantumbadger.redreader.receivers.announcements.AnnouncementDownloader;
@@ -186,7 +189,21 @@ public class MainMenuListingManager {
 			final EnumSet<MainMenuFragment.MainMenuShortcutItems> mainMenuShortcutItems
 					= PrefsUtility.pref_menus_mainmenu_shortcutitems();
 
-			if(mainMenuShortcutItems.contains(MainMenuFragment.MainMenuShortcutItems.FRONTPAGE)) {
+			mAdapter.appendToGroup(GROUP_MAIN_ITEMS, new GroupedRecyclerViewItemListItemView(
+                    null, user.isAnonymous() ? "🔑 Login Reddit (Pass / Cookie)" : ("🔑 Account: u/" + user.username),
+                    null, true, v -> {
+                        if (user.isAnonymous()) mActivity.startActivity(new Intent(mActivity, OAuthLoginActivity.class));
+                        else AccountListDialog.show(mActivity);
+                    }, null, Optional.of(rrIconPerson), Optional.empty(), Optional.empty()));
+            final boolean trOn = WatchHelper.isTranslateEnabled(mContext);
+            mAdapter.appendToGroup(GROUP_MAIN_ITEMS, new GroupedRecyclerViewItemListItemView(
+                    null, trOn ? "🌐 Traduzione IT: ATTIVA" : "🌐 Traduzione IT: SPENTA",
+                    null, false, v -> {
+                        final boolean now = WatchHelper.toggleTranslate(mContext);
+                        Toast.makeText(mContext, now ? "Traduzione IT attivata" : "Traduzione IT disattivata", Toast.LENGTH_SHORT).show();
+                        mActivity.recreate();
+                    }, null, Optional.empty(), Optional.empty(), Optional.empty()));
+            if(mainMenuShortcutItems.contains(MainMenuFragment.MainMenuShortcutItems.FRONTPAGE)) {
 				mAdapter.appendToGroup(
 						GROUP_MAIN_ITEMS,
 						makeItem(

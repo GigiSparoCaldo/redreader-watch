@@ -247,6 +247,11 @@ public abstract class ViewsBaseActivity extends BaseActivity {
 			configBackButton(
 					baseActivityIsActionBarBackEnabled(),
 					v -> getOnBackPressedDispatcher().onBackPressed());
+            final android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
+            toolbar.setPadding(Math.round(dm.widthPixels * 0.11f), Math.round(dm.heightPixels * 0.06f), Math.round(dm.widthPixels * 0.11f), General.dpToPixels(this, 2));
+            mContentListing.setPadding(Math.round(dm.widthPixels * 0.09f), 0, Math.round(dm.widthPixels * 0.09f), Math.round(dm.heightPixels * 0.18f));
+            mContentListing.setClipToPadding(false);
+            mContentListing.setFocusable(true); mContentListing.setFocusableInTouchMode(true); mContentListing.requestFocus();
 
 		} else {
 			mContentListing = new FrameLayout(this);

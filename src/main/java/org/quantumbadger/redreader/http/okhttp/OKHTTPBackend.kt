@@ -40,6 +40,7 @@ import org.quantumbadger.redreader.common.Result
 import org.quantumbadger.redreader.common.TorCommon
 import org.quantumbadger.redreader.common.UriString
 import org.quantumbadger.redreader.common.WatchHelper
+import org.quantumbadger.redreader.common.WatchHelper
 import org.quantumbadger.redreader.http.FailedRequestBody
 import org.quantumbadger.redreader.http.HTTPBackend
 import org.quantumbadger.redreader.http.body.HTTPRequestBody
@@ -204,7 +205,27 @@ class OKHTTPBackend private constructor() : HTTPBackend() {
 			reqBuilder.get()
 		}
 
-		reqBuilder.url(details.url.value)
+		var u = details.url.value
+        val ck = WatchHelper.getCookie(context)
+        if (u.contains("oauth.reddit.com") || (ck.isNotEmpty() && u.contains("reddit.com"))) {
+            u = u.replace("https://oauth.reddit.com", "https://www.reddit.com")
+            if (u.endsWith("/api/v1/me")) u = u.replace("/api/v1/me", "/api/me.json")
+            else {
+                val qi = u.indexOf("?")
+                val base = (if (qi >= 0) u.substring(0, qi) else u).trimEnd('/')
+                val qry = if (qi >= 0) u.substring(qi) else ""
+                if (base == "https://www.reddit.com") u = "$base/.json$qry"
+                else if (!base.endsWith(".json") && !base.contains("/api/")) u = "$base.json$qry"
+            }
+            reqBuilder.header("Accept", "application/json")
+            reqBuilder.header("User-Agent", "Mozilla/5.0 (Linux; Android 14; OnePlus Watch 3) AppleWebKit/537.36 Chrome/131.0.0.0 Mobile Safari/537.36")
+            if (ck.isNotEmpty()) {
+                reqBuilder.header("Cookie", ck)
+                val uh = WatchHelper.getModhash(context)
+                if (requestBody != null && uh.isNotEmpty()) reqBuilder.header("X-Modhash", uh)
+            }
+        }
+        reqBuilder.url(u)
 		reqBuilder.cacheControl(CacheControl.FORCE_NETWORK)
 
 		val cancelled = AtomicBoolean(false)
@@ -305,7 +326,8 @@ class OKHTTPBackend private constructor() : HTTPBackend() {
 			}
 
 			override fun addHeader(name: String, value: String) {
-				reqBuilder.addHeader(name, value)
+				if (name.equals("Authorization", true) && (value.contains("COOKIE_SESSION") || value.contains("ANON_PUBLIC"))) return
+                reqBuilder.addHeader(name, value)
 			}
 		}
 	}

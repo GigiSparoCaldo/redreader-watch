@@ -93,7 +93,41 @@ public abstract class BaseActivity extends AppCompatActivity
 		}
 	};
 
-	public void closeAllExceptMain() {
+	@Override
+    public void onWindowFocusChanged(final boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus && getWindow() != null && getCurrentFocus() == null) {
+            final android.view.View d = getWindow().getDecorView();
+            d.setFocusable(true); d.setFocusableInTouchMode(true); d.requestFocus();
+        }
+    }
+
+    @Override
+    public boolean dispatchGenericMotionEvent(final android.view.MotionEvent ev) {
+        if (ev.getAction() == android.view.MotionEvent.ACTION_SCROLL) {
+            float ax = ev.getAxisValue(android.view.MotionEvent.AXIS_SCROLL);
+            if (ax == 0f) ax = ev.getAxisValue(android.view.MotionEvent.AXIS_VSCROLL);
+            if (ax != 0f && getWindow() != null) {
+                final int dy = Math.round(-ax * General.dpToPixels(this, 72));
+                if (scrollAny(getWindow().getDecorView(), dy)) return true;
+            }
+        }
+        return super.dispatchGenericMotionEvent(ev);
+    }
+
+    private static boolean scrollAny(final android.view.View v, final int dy) {
+        if (v == null || v.getVisibility() != android.view.View.VISIBLE) return false;
+        if (v instanceof android.view.ViewGroup) {
+            final android.view.ViewGroup vg = (android.view.ViewGroup) v;
+            for (int i = vg.getChildCount() - 1; i >= 0; i--) {
+                if (scrollAny(vg.getChildAt(i), dy)) return true;
+            }
+        }
+        if (v.canScrollVertically(dy)) { v.scrollBy(0, dy); return true; }
+        return false;
+    }
+
+    public void closeAllExceptMain() {
 		closingAll = true;
 		closeIfNecessary();
 	}
