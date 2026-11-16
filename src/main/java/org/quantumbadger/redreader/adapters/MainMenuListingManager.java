@@ -49,6 +49,8 @@ import org.quantumbadger.redreader.common.ScreenreaderPronunciation;
 import org.quantumbadger.redreader.common.SharedPrefsWrapper;
 import org.quantumbadger.redreader.common.UriString;
 import org.quantumbadger.redreader.common.WatchHelper;
+import org.quantumbadger.redreader.reddit.url.SubredditPostListURL;
+import org.quantumbadger.redreader.common.WatchHelper;
 import org.quantumbadger.redreader.activities.OAuthLoginActivity;
 import org.quantumbadger.redreader.fragments.AccountListDialog;
 import org.quantumbadger.redreader.fragments.MainMenuFragment;
@@ -203,6 +205,25 @@ public class MainMenuListingManager {
                         Toast.makeText(mContext, now ? "Traduzione IT attivata" : "Traduzione IT disattivata", Toast.LENGTH_SHORT).show();
                         mActivity.recreate();
                     }, null, Optional.empty(), Optional.empty(), Optional.empty()));
+            final boolean trOn = WatchHelper.isTranslateEnabled(mContext);
+            mAdapter.appendToGroup(GROUP_MAIN_ITEMS, new GroupedRecyclerViewItemListItemView(
+                    null, trOn ? "🌐 Traduzione IT: ATTIVA" : "🌐 Traduzione IT: SPENTA",
+                    null, true, v -> {
+                        final boolean now = WatchHelper.toggleTranslate(mContext);
+                        Toast.makeText(mContext, now ? "Traduzione IT attivata" : "Traduzione IT disattivata", Toast.LENGTH_SHORT).show();
+                        mActivity.recreate();
+                    }, null, Optional.empty(), Optional.empty(), Optional.empty()));
+            mAdapter.appendToGroup(GROUP_MAIN_ITEMS, new GroupedRecyclerViewItemListItemView(
+                    null, "🔍 Apri Subreddit (r/...)",
+                    null, false, v -> {
+                        final android.widget.EditText et = new android.widget.EditText(mActivity);
+                        et.setHint("es. italy, android, earthporn"); et.setSingleLine(true);
+                        new MaterialAlertDialogBuilder(mActivity).setTitle("Apri Subreddit").setView(et)
+                            .setPositiveButton("Apri", (d, w) -> {
+                                String sub = et.getText().toString().trim().replaceAll("^/+|/+$", "").replaceFirst("^r/", "");
+                                if (!sub.isEmpty()) mListener.onSelected((PostListingURL) SubredditPostListURL.getSubreddit(sub));
+                            }).setNegativeButton("Annulla", null).show();
+                    }, null, Optional.of(rrIconAccountSearch), Optional.empty(), Optional.empty()));
             if(mainMenuShortcutItems.contains(MainMenuFragment.MainMenuShortcutItems.FRONTPAGE)) {
 				mAdapter.appendToGroup(
 						GROUP_MAIN_ITEMS,

@@ -34,6 +34,33 @@ public final class WatchHelper {
         return ctx.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
+        @NonNull
+    public static String rewriteUrl(@NonNull final Context ctx, @NonNull final String rawUrl,
+                                    @NonNull final okhttp3.Request.Builder rb, final boolean isPost) {
+        String u = rawUrl;
+        final String ck = getCookie(ctx);
+        if (u.contains("oauth.reddit.com") || u.contains("reddit.com")) {
+            u = u.replace("https://oauth.reddit.com", "https://old.reddit.com")
+                 .replace("https://www.reddit.com", "https://old.reddit.com")
+                 .replace("/.json", ".json");
+            final int qi = u.indexOf('?');
+            String base = (qi >= 0 ? u.substring(0, qi) : u).replaceAll("/+$", "");
+            final String qry = qi >= 0 ? u.substring(qi) : "";
+            if ("https://old.reddit.com".equals(base)) u = base + "/.json" + qry;
+            else if (!base.endsWith(".json") && !base.contains("/api/")) u = base + ".json" + qry;
+            else u = base + qry;
+            if (!u.contains("raw_json=")) u += (u.contains("?") ? "&" : "?") + "raw_json=1";
+            rb.header("Accept", "application/json");
+            rb.header("User-Agent", "android:org.quantumbadger.redreader.watch:v1.27 (by /u/wristreader)");
+            if (!ck.isEmpty()) {
+                rb.header("Cookie", ck);
+                final String uh = getModhash(ctx);
+                if (isPost && !uh.isEmpty()) rb.header("X-Modhash", uh);
+            }
+        }
+        return u;
+    }
+
     public static boolean isTranslateEnabled(@NonNull final Context ctx) {
         return prefs(ctx).getBoolean(KEY_TRANSLATE, true);
     }
