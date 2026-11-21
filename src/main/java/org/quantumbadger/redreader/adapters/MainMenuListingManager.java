@@ -218,12 +218,12 @@ public class MainMenuListingManager {
                     null, false, v -> {
                         final android.widget.EditText et = new android.widget.EditText(mActivity);
                         et.setHint("es. italy, android, earthporn"); et.setSingleLine(true);
-                        new MaterialAlertDialogBuilder(mActivity).setTitle("Apri Subreddit").setView(et)
+                        new com.google.android.material.dialog.MaterialAlertDialogBuilder(mActivity).setTitle("Apri Subreddit").setView(et)
                             .setPositiveButton("Apri", (d, w) -> {
                                 String sub = et.getText().toString().trim().replaceAll("^/+|/+$", "").replaceFirst("^r/", "");
-                                if (!sub.isEmpty()) mListener.onSelected((PostListingURL) SubredditPostListURL.getSubreddit(sub));
+                                if (!sub.isEmpty()) mListener.onSelected(SubredditPostListURL.getSubreddit(sub));
                             }).setNegativeButton("Annulla", null).show();
-                    }, null, Optional.of(rrIconAccountSearch), Optional.empty(), Optional.empty()));
+                    }, null, Optional.empty(), Optional.empty(), Optional.empty()));
             if(mainMenuShortcutItems.contains(MainMenuFragment.MainMenuShortcutItems.FRONTPAGE)) {
 				mAdapter.appendToGroup(
 						GROUP_MAIN_ITEMS,
@@ -273,7 +273,7 @@ public class MainMenuListingManager {
 									false,
 									clickListener,
 									null,
-									Optional.of(rrIconAccountSearch),
+									Optional.empty(),
 									Optional.of(view -> mListener.onSelected(
 											MainMenuFragment.MENU_MENU_ACTION_CUSTOM)),
 									Optional.of(activity.getString(
@@ -846,7 +846,7 @@ public class MainMenuListingManager {
 			menuText[i] = menu.get(i).title;
 		}
 
-		final MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(activity);
+		final MaterialAlertDialogBuilder builder = new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity);
 
 		builder.setItems(menuText, (dialog, which) -> onSubredditActionMenuItemSelected(
 				subreddit,
