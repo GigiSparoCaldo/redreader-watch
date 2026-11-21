@@ -197,17 +197,15 @@ public class MainMenuListingManager {
                         if (user.isAnonymous()) mActivity.startActivity(new Intent(mActivity, OAuthLoginActivity.class));
                         else AccountListDialog.show(mActivity);
                     }, null, Optional.of(rrIconPerson), Optional.empty(), Optional.empty()));
-            final boolean trOn = WatchHelper.isTranslateEnabled(mContext);
-            mAdapter.appendToGroup(GROUP_MAIN_ITEMS, new GroupedRecyclerViewItemListItemView(
-                    null, trOn ? "🌐 Traduzione IT: ATTIVA" : "🌐 Traduzione IT: SPENTA",
+                        mAdapter.appendToGroup(GROUP_MAIN_ITEMS, new GroupedRecyclerViewItemListItemView(
+                    null, WatchHelper.isTranslateEnabled(mContext) ? "🌐 Traduzione IT: ATTIVA" : "🌐 Traduzione IT: SPENTA",
                     null, false, v -> {
                         final boolean now = WatchHelper.toggleTranslate(mContext);
                         Toast.makeText(mContext, now ? "Traduzione IT attivata" : "Traduzione IT disattivata", Toast.LENGTH_SHORT).show();
                         mActivity.recreate();
                     }, null, Optional.empty(), Optional.empty(), Optional.empty()));
-            final boolean trOn = WatchHelper.isTranslateEnabled(mContext);
-            mAdapter.appendToGroup(GROUP_MAIN_ITEMS, new GroupedRecyclerViewItemListItemView(
-                    null, trOn ? "🌐 Traduzione IT: ATTIVA" : "🌐 Traduzione IT: SPENTA",
+                        mAdapter.appendToGroup(GROUP_MAIN_ITEMS, new GroupedRecyclerViewItemListItemView(
+                    null, WatchHelper.isTranslateEnabled(mContext) ? "🌐 Traduzione IT: ATTIVA" : "🌐 Traduzione IT: SPENTA",
                     null, true, v -> {
                         final boolean now = WatchHelper.toggleTranslate(mContext);
                         Toast.makeText(mContext, now ? "Traduzione IT attivata" : "Traduzione IT disattivata", Toast.LENGTH_SHORT).show();
@@ -221,7 +219,7 @@ public class MainMenuListingManager {
                         new com.google.android.material.dialog.MaterialAlertDialogBuilder(mActivity).setTitle("Apri Subreddit").setView(et)
                             .setPositiveButton("Apri", (d, w) -> {
                                 String sub = et.getText().toString().trim().replaceAll("^/+|/+$", "").replaceFirst("^r/", "");
-                                if (!sub.isEmpty()) mListener.onSelected(SubredditPostListURL.getSubreddit(sub));
+                                if (!sub.isEmpty()) mListener.onSelected((org.quantumbadger.redreader.reddit.url.PostListingURL) SubredditPostListURL.getSubreddit(sub));
                             }).setNegativeButton("Annulla", null).show();
                     }, null, Optional.empty(), Optional.empty(), Optional.empty()));
             if(mainMenuShortcutItems.contains(MainMenuFragment.MainMenuShortcutItems.FRONTPAGE)) {
