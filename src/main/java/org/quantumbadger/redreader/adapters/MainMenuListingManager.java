@@ -219,7 +219,7 @@ public class MainMenuListingManager {
                         new com.google.android.material.dialog.MaterialAlertDialogBuilder(mActivity).setTitle("Apri Subreddit").setView(et)
                             .setPositiveButton("Apri", (d, w) -> {
                                 String sub = et.getText().toString().trim().replaceAll("^/+|/+$", "").replaceFirst("^r/", "");
-                                if (!sub.isEmpty()) mListener.onSelected((org.quantumbadger.redreader.reddit.url.PostListingURL) SubredditPostListURL.getSubreddit(sub));
+                                if (!sub.isEmpty()) { try { mListener.onSelected((org.quantumbadger.redreader.reddit.url.PostListingURL) SubredditPostListURL.getSubreddit(sub)); } catch (final Exception e) { Toast.makeText(mActivity, "Nome non valido", Toast.LENGTH_SHORT).show(); } }
                             }).setNegativeButton("Annulla", null).show();
                     }, null, Optional.empty(), Optional.empty(), Optional.empty()));
             if(mainMenuShortcutItems.contains(MainMenuFragment.MainMenuShortcutItems.FRONTPAGE)) {
