@@ -46,8 +46,13 @@ public final class WatchHelper {
             final int qi = u.indexOf('?');
             String base = (qi >= 0 ? u.substring(0, qi) : u).replaceAll("/+$", "");
             final String qry = qi >= 0 ? u.substring(qi) : "";
-            if ("https://old.reddit.com".equals(base)) u = base + "/.json" + qry;
-            else if (!base.endsWith(".json") && !base.contains("/api/")) u = base + ".json" + qry;
+            if (ck.isEmpty() && base.contains("/subreddits/mine")) base = "https://old.reddit.com/subreddits/popular.json";
+            if ("https://old.reddit.com".equals(base) || "https://old.reddit.com/best.json".equals(base) || "https://old.reddit.com/best".equals(base)) {
+                u = "https://old.reddit.com/.json" + qry;
+            } else if (base.matches("https://old\\.reddit\\.com/(hot|new|top|rising|controversial)(\\.json)?")) {
+                final String sort = base.replace("https://old.reddit.com/", "").replace(".json", "");
+                u = "https://old.reddit.com/" + sort + "/.json" + qry;
+            } else if (!base.endsWith(".json") && !base.contains("/api/")) u = base + ".json" + qry;
             else u = base + qry;
             if (!u.contains("raw_json=")) u += (u.contains("?") ? "&" : "?") + "raw_json=1";
             rb.header("Accept", "application/json");

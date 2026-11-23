@@ -212,6 +212,11 @@ public class MainMenuListingManager {
                         mActivity.recreate();
                     }, null, Optional.empty(), Optional.empty(), Optional.empty()));
             mAdapter.appendToGroup(GROUP_MAIN_ITEMS, new GroupedRecyclerViewItemListItemView(
+                    null, "🔥 Popolari (r/popular)",
+                    null, false, v -> {
+                        try { mListener.onSelected((org.quantumbadger.redreader.reddit.url.PostListingURL) SubredditPostListURL.getSubreddit("popular")); } catch (final Exception ignored) {}
+                    }, null, Optional.empty(), Optional.empty(), Optional.empty()));
+            mAdapter.appendToGroup(GROUP_MAIN_ITEMS, new GroupedRecyclerViewItemListItemView(
                     null, "🔍 Apri Subreddit (r/...)",
                     null, false, v -> {
                         final android.widget.EditText et = new android.widget.EditText(mActivity);
